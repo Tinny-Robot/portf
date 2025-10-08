@@ -2,6 +2,41 @@
 
 This is the portfolio website for Nathaniel Handan, an AI/ML Engineer and Robotics Specialist.
 
+[![GitHub stars](https://img.shields.io/github/stars/Tinny-Robot/portf)](https://github.com/Tinny-Robot/portf/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/Tinny-Robot/portf)](https://github.com/Tinny-Robot/portf/issues)
+[![GitHub license](https://img.shields.io/github/license/Tinny-Robot/portf)](https://github.com/Tinny-Robot/portf/blob/main/LICENSE)
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](CONTRIBUTING.md)
+
+## 🚀 Quick Start
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Tinny-Robot/portf.git
+   cd portf
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+## 🤝 Contributing
+
+Contributions are welcome! Here are some ways you can contribute:
+
+- 🐛 Report bugs and issues
+- 💡 Suggest new features
+- 🔧 Submit pull requests
+- 📝 Improve documentation
+- 🎨 Enhance UI/UX
+
+Please read our [Contributing Guidelines](CONTRIBUTING.md) to get started.
+
 ## 🗂️ Project Structure
 
 ```
