@@ -13,7 +13,7 @@ All asset paths have been updated to include the `/portf/` repository prefix:
 - ✅ Component URLs: `/portf/_astro/ThemeToggle.IrXc0lLY.js`, etc.
 
 ### 2. Meta Tags & URLs
-- ✅ Updated canonical URL to `https://tinny-robot.github.io/portf/`
+- ✅ Updated canonical URL to `https://nathaniel.name.ng/portf/`
 - ✅ Updated Open Graph URLs
 - ✅ Updated Twitter Card URLs
 - ✅ Fixed internal navigation links
@@ -64,10 +64,10 @@ Deploy to a custom domain or use `username.github.io` (root) instead of `usernam
    ```
 
 2. **Check These URLs After Deploy:**
-   - `https://tinny-robot.github.io/portf/` (homepage)
-   - `https://tinny-robot.github.io/portf/favicon.svg` (favicon)
-   - `https://tinny-robot.github.io/portf/me.png` (profile image)
-   - `https://tinny-robot.github.io/portf/_astro/index.jOG576FZ.css` (CSS file)
+   - `https://nathaniel.name.ng/portf/` (homepage)
+   - `https://nathaniel.name.ng/portf/favicon.svg` (favicon)
+   - `https://nathaniel.name.ng/portf/me.png` (profile image)
+   - `https://nathaniel.name.ng/portf/_astro/index.jOG576FZ.css` (CSS file)
 
 ## GitHub Pages Settings
 

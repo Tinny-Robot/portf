@@ -106,7 +106,7 @@ The `/_astro` directory contains compiled assets:
 
 ## 🔗 Links
 
-- **Live Site**: https://tinny-robot.github.io/portf/
+- **Live Site**: https://nathaniel.name.ng/portf/
 - **GitHub**: https://github.com/Tinny-Robot
 - **LinkedIn**: https://www.linkedin.com/in/nathanielhandan/
 
