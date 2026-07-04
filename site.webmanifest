@@ -1,0 +1,12 @@
+{
+  "name": "Nathaniel Handan Portfolio",
+  "short_name": "NH Portfolio",
+  "description": "AI, robotics and systems architecture portfolio for Nathaniel Handan.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#05070d",
+  "theme_color": "#2dd4bf",
+  "icons": [
+    { "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

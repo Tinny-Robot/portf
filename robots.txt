@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://nathaniel.name.ng/sitemap.xml

@@ -1,0 +1,275 @@
+
+<style>
+  body { margin: 0; cursor: none; }
+  .demo-wrap { display: flex; flex-direction: column; gap: 0; }
+  .demo-panel {
+    position: relative;
+    height: 260px;
+    overflow: hidden;
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-lg);
+    background: #0a0e14;
+    cursor: none;
+  }
+  .demo-panel + .demo-panel { margin-top: 12px; }
+  .panel-label {
+    position: absolute;
+    top: 12px; left: 16px;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: #4ade80;
+    font-family: monospace;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .coords {
+    position: absolute;
+    top: 12px; right: 16px;
+    font-size: 10px;
+    font-family: monospace;
+    color: #4ade80;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .switch-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    padding: 6px 14px;
+    font-size: 13px;
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    background: var(--color-background-secondary);
+    border: 0.5px solid var(--color-border-secondary);
+    color: var(--color-text-primary);
+  }
+  .switch-btn:hover { background: var(--color-background-tertiary); }
+  .active-mode {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin-bottom: 12px;
+  }
+</style>
+
+<h2 class="sr-only">Interactive robotic cursor demo showing two styles: HUD reticle and segmented snake robot</h2>
+
+<div class="demo-wrap">
+  <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:4px;">
+    <button class="switch-btn" id="btn-hud" onclick="setMode('hud')">HUD Reticle</button>
+    <button class="switch-btn" id="btn-snake" onclick="setMode('snake')">Snake Robot</button>
+    <button class="switch-btn" id="btn-ik" onclick="setMode('ik')">IK Arm</button>
+    <span class="active-mode" id="mode-label">Move your mouse inside the panel</span>
+  </div>
+
+  <div class="demo-panel" id="panel">
+    <div class="panel-label" id="panel-title">HUD TARGETING RETICLE</div>
+    <div class="coords" id="coords">X: 000 Y: 000</div>
+    <canvas id="c" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
+  </div>
+</div>
+
+<script>
+const panel = document.getElementById('panel');
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const coordEl = document.getElementById('coords');
+const titleEl = document.getElementById('panel-title');
+const modeLabel = document.getElementById('mode-label');
+
+let W, H, mx = -200, my = -200;
+let mode = 'hud';
+let animId;
+
+function resize() {
+  W = canvas.width = panel.clientWidth;
+  H = canvas.height = panel.clientHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+panel.addEventListener('mousemove', e => {
+  const r = panel.getBoundingClientRect();
+  mx = e.clientX - r.left;
+  my = e.clientY - r.top;
+  coordEl.textContent = `X: ${String(Math.round(mx)).padStart(3,'0')} Y: ${String(Math.round(my)).padStart(3,'0')}`;
+});
+panel.addEventListener('mouseleave', () => { mx = -200; my = -200; });
+
+function setMode(m) {
+  mode = m;
+  snake.segments = Array.from({length:20}, () => ({x: W/2, y: H/2}));
+  ikAngle1 = 0; ikAngle2 = 0;
+  const labels = { hud: 'HUD TARGETING RETICLE', snake: 'SEGMENTED SNAKE ROBOT', ik: 'INVERSE KINEMATICS ARM' };
+  titleEl.textContent = labels[m];
+  modeLabel.textContent = 'Mode: ' + m.toUpperCase();
+}
+
+let hudRot = 0;
+let hudPulse = 0;
+let clickFlash = 0;
+panel.addEventListener('mousedown', () => { clickFlash = 30; });
+
+function drawHUD() {
+  ctx.clearRect(0,0,W,H);
+  if (mx < 0) return;
+  hudRot += 0.02;
+  hudPulse += 0.05;
+  const pulse = 1 + Math.sin(hudPulse) * 0.06;
+  const x = mx, y = my;
+
+  ctx.save();
+  ctx.strokeStyle = clickFlash > 0 ? '#ff4444' : '#4ade80';
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.9;
+
+  const r = 28 * pulse;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+
+  ctx.save(); ctx.translate(x, y); ctx.rotate(hudRot);
+  for (let i = 0; i < 4; i++) {
+    ctx.save(); ctx.rotate(i * Math.PI / 2);
+    ctx.beginPath();
+    const segR = r * 1.05;
+    ctx.arc(0, 0, segR, 0.2, Math.PI/2 - 0.2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+
+  const gap = 8; const arm = 16;
+  ctx.beginPath(); ctx.moveTo(x - r - gap - arm, y); ctx.lineTo(x - r - gap, y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + r + gap, y); ctx.lineTo(x + r + gap + arm, y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y - r - gap - arm); ctx.lineTo(x, y - r - gap); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y + r + gap); ctx.lineTo(x, y + r + gap + arm); ctx.stroke();
+
+  ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fillStyle = '#4ade80'; ctx.fill();
+
+  if (clickFlash > 0) {
+    ctx.globalAlpha = clickFlash / 30;
+    ctx.font = '10px monospace'; ctx.fillStyle = '#ff4444';
+    ctx.fillText('LOCKED', x + r + 10, y - 6);
+    clickFlash--;
+  } else {
+    ctx.globalAlpha = 0.5;
+    ctx.font = '9px monospace'; ctx.fillStyle = '#4ade80';
+    ctx.fillText(`${Math.round(mx)},${Math.round(my)}`, x + r + 8, y - 4);
+  }
+  ctx.restore();
+}
+
+const snake = { segments: Array.from({length:20}, () => ({x:200,y:130})) };
+const SEG_LEN = 12;
+
+function drawSnake() {
+  ctx.clearRect(0,0,W,H);
+  const segs = snake.segments;
+  if (mx >= 0) {
+    segs[0].x += (mx - segs[0].x) * 0.25;
+    segs[0].y += (my - segs[0].y) * 0.25;
+  }
+  for (let i = 1; i < segs.length; i++) {
+    const dx = segs[i].x - segs[i-1].x;
+    const dy = segs[i].y - segs[i-1].y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist > SEG_LEN) {
+      const angle = Math.atan2(dy, dx);
+      segs[i].x = segs[i-1].x + Math.cos(angle) * SEG_LEN;
+      segs[i].y = segs[i-1].y + Math.sin(angle) * SEG_LEN;
+    }
+  }
+
+  for (let i = segs.length - 1; i >= 0; i--) {
+    const t = i / segs.length;
+    const r = 3 + (1 - t) * 7;
+    const alpha = 0.3 + t * 0.7;
+    ctx.beginPath();
+    ctx.arc(segs[i].x, segs[i].y, r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(74, 222, 128, ${alpha})`;
+    ctx.fill();
+    if (i > 0 && i % 3 === 0) {
+      ctx.strokeStyle = `rgba(74, 222, 128, ${alpha * 0.4})`;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(segs[i].x, segs[i].y - r);
+      ctx.lineTo(segs[i].x, segs[i].y + r);
+      ctx.stroke();
+    }
+  }
+
+  ctx.beginPath();
+  ctx.arc(segs[0].x, segs[0].y, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+}
+
+const ARM_L1 = 90, ARM_L2 = 70;
+let ikAngle1 = 0, ikAngle2 = 0;
+const IK_ORIGIN = { x: 0, y: 0 };
+
+function solveIK(tx, ty) {
+  IK_ORIGIN.x = W * 0.1;
+  IK_ORIGIN.y = H * 0.85;
+  const dx = tx - IK_ORIGIN.x;
+  const dy = ty - IK_ORIGIN.y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const clamped = Math.min(dist, ARM_L1 + ARM_L2 - 1);
+  const cos2 = (clamped*clamped - ARM_L1*ARM_L1 - ARM_L2*ARM_L2) / (2 * ARM_L1 * ARM_L2);
+  const a2 = -Math.acos(Math.max(-1, Math.min(1, cos2)));
+  const a1 = Math.atan2(dy, dx) - Math.atan2(ARM_L2 * Math.sin(a2), ARM_L1 + ARM_L2 * Math.cos(a2));
+  return [a1, a2];
+}
+
+function drawIK() {
+  ctx.clearRect(0,0,W,H);
+  const ox = W * 0.1, oy = H * 0.85;
+  const tx = mx >= 0 ? mx : ox + 100;
+  const ty = mx >= 0 ? my : oy - 100;
+  const [a1, a2] = solveIK(tx, ty);
+  ikAngle1 += (a1 - ikAngle1) * 0.15;
+  ikAngle2 += (a2 - ikAngle2) * 0.15;
+
+  const j1x = ox + Math.cos(ikAngle1) * ARM_L1;
+  const j1y = oy + Math.sin(ikAngle1) * ARM_L1;
+  const j2x = j1x + Math.cos(ikAngle1 + ikAngle2) * ARM_L2;
+  const j2y = j1y + Math.sin(ikAngle1 + ikAngle2) * ARM_L2;
+
+  ctx.strokeStyle = '#4ade80';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(j1x, j1y); ctx.stroke();
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(j1x, j1y); ctx.lineTo(j2x, j2y); ctx.stroke();
+
+  [{ x:ox, y:oy }, { x:j1x, y:j1y }].forEach(p => {
+    ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2);
+    ctx.fillStyle = '#1a2a1a'; ctx.fill();
+    ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 1.5; ctx.stroke();
+  });
+
+  ctx.save(); ctx.translate(j2x, j2y);
+  ctx.rotate(ikAngle1 + ikAngle2);
+  ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-8, -6); ctx.lineTo(8, 0); ctx.lineTo(-8, 6); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI*2);
+  ctx.fillStyle = '#4ade80'; ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = 'rgba(74,222,128,0.2)';
+  ctx.lineWidth = 0.5; ctx.setLineDash([3,4]);
+  ctx.beginPath(); ctx.moveTo(j2x, j2y); ctx.lineTo(tx, ty); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.beginPath(); ctx.arc(ox, oy, ARM_L1 + ARM_L2, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(74,222,128,0.06)'; ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function loop() {
+  if (mode === 'hud') drawHUD();
+  else if (mode === 'snake') drawSnake();
+  else if (mode === 'ik') drawIK();
+  animId = requestAnimationFrame(loop);
+}
+loop();
+</script>

@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>6-DOF Arm Cursor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    cursor: none;
+    background: #050810;
+    color: #c8d0e0;
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  #arm-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  .grid-bg {
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(30,80,120,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(30,80,120,0.07) 1px, transparent 1px);
+    background-size: 48px 48px;
+    z-index: 0;
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 80px 40px 120px;
+  }
+
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: #378add;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-size: clamp(36px, 5vw, 64px);
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: #eef2ff;
+    margin-bottom: 24px;
+  }
+
+  h1 span {
+    color: #4ade80;
+  }
+
+  .sub {
+    font-size: 17px;
+    font-weight: 300;
+    line-height: 1.7;
+    color: #7a8ba0;
+    max-width: 540px;
+    margin-bottom: 56px;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 64px;
+  }
+
+  .card {
+    background: #080c14;
+    padding: 28px 24px;
+    transition: background 0.2s;
+  }
+
+  .card:hover { background: #0d1520; }
+
+  .card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: #378add;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .card-val {
+    font-size: 28px;
+    font-weight: 600;
+    color: #eef2ff;
+    margin-bottom: 4px;
+  }
+
+  .card-desc {
+    font-size: 13px;
+    color: #4a5a70;
+  }
+
+  .section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: #378add;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(55,138,221,0.15);
+  }
+
+  .spec-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 56px;
+  }
+
+  .spec-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    background: #080c14;
+  }
+
+  .spec-name {
+    font-size: 14px;
+    color: #8090a8;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .spec-val {
+    font-size: 13px;
+    color: #4ade80;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #2a3a50;
+    letter-spacing: 0.1em;
+    text-align: center;
+    margin-top: 48px;
+  }
+
+  .reach-indicator {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: rgba(5,8,16,0.85);
+    border: 1px solid rgba(55,138,221,0.2);
+    color: #4ade80;
+    z-index: 10000;
+    pointer-events: none;
+    transition: color 0.3s, border-color 0.3s;
+  }
+
+  .reach-indicator.out { color: #ff4444; border-color: rgba(255,68,68,0.3); }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<canvas id="arm-canvas"></canvas>
+
+<div class="reach-indicator" id="reach-ind">ARM: IN RANGE</div>
+
+<div class="content">
+  <p class="eyebrow">Robotics Interface System v2.4</p>
+  <h1>6-DOF<br><span>Constrained</span><br>Arm Cursor</h1>
+  <p class="sub">
+    A FABRIK-solved hyper-redundant manipulator with per-joint angle constraints,
+    SOTA industrial beam rendering, and HUD reticle fallback when the target
+    exits the workspace envelope.
+  </p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">DOF</div>
+      <div class="card-val">6</div>
+      <div class="card-desc">Degrees of freedom</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Solver</div>
+      <div class="card-val">FABRIK</div>
+      <div class="card-desc">Forward & backward reaching IK</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Reach</div>
+      <div class="card-val">228px</div>
+      <div class="card-desc">Max workspace radius</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Iters</div>
+      <div class="card-val">15</div>
+      <div class="card-desc">Max per frame, tol 0.8px</div>
+    </div>
+  </div>
+
+  <p class="section-title">Joint constraint table</p>
+  <div class="spec-list">
+    <div class="spec-row">
+      <span class="spec-name">J0  shoulder</span>
+      <span class="spec-val">±85° from vertical</span>
+    </div>
+    <div class="spec-row">
+      <span class="spec-name">J1  elbow upper</span>
+      <span class="spec-val">±110° relative to parent</span>
+    </div>
+    <div class="spec-row">
+      <span class="spec-name">J2  elbow lower</span>
+      <span class="spec-val">±100°, no hyperextension</span>
+    </div>
+    <div class="spec-row">
+      <span class="spec-name">J3  wrist</span>
+      <span class="spec-val">±70° relative to parent</span>
+    </div>
+    <div class="spec-row">
+      <span class="spec-name">J4  wrist roll</span>
+      <span class="spec-val">±60° relative to parent</span>
+    </div>
+    <div class="spec-row">
+      <span class="spec-name">J5  end-effector</span>
+      <span class="spec-val">unconstrained</span>
+    </div>
+  </div>
+
+  <p class="hint">// MOVE CURSOR FREELY &mdash; PUSH TO EDGE TO TRIGGER HUD RETICLE</p>
+</div>
+
+<script>
+const canvas = document.getElementById('arm-canvas');
+const ctx = canvas.getContext('2d');
+const reachInd = document.getElementById('reach-ind');
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  initArm();
+}
+
+const SEGS = [55, 50, 40, 35, 28, 20];
+const N = SEGS.length;
+const TOTAL_LEN = SEGS.reduce((a,b) => a+b, 0);
+
+const JOINT_CONSTRAINTS = [
+  { type: 'absolute', minAngle: -Math.PI*0.5 - Math.PI*85/180, maxAngle: -Math.PI*0.5 + Math.PI*85/180 },
+  { type: 'relative', range: Math.PI*110/180 },
+  { type: 'relative', range: Math.PI*100/180 },
+  { type: 'relative', range: Math.PI*70/180 },
+  { type: 'relative', range: Math.PI*60/180 },
+  { type: 'none' },
+];
+
+const JOINT_COLORS = ['#378add','#4ade80','#378add','#4ade80','#378add','#ffffff'];
+const SEG_WIDTHS  = [18, 15, 12, 10, 8, 6];
+
+let joints = [];
+let origin = { x: 0, y: 0 };
+let target = { x: 0, y: 0 };
+let gripClose = false;
+let gripAnim = 0;
+let outOfRange = false;
+let hudRot = 0;
+let hudPulse = 0;
+
+function initArm() {
+  origin = { x: 100, y: H - 60 };
+  joints = [];
+  let cx = origin.x, cy = origin.y;
+  joints.push({ x: cx, y: cy });
+  for (let i = 0; i < N; i++) {
+    cy -= SEGS[i];
+    joints.push({ x: cx, y: cy });
+  }
+  target = { x: origin.x + 120, y: origin.y - 180 };
+}
+
+function clampAngle(angle) {
+  while (angle > Math.PI) angle -= Math.PI * 2;
+  while (angle < -Math.PI) angle += Math.PI * 2;
+  return angle;
+}
+
+function applyConstraint(jointIdx, jx, jy, parentAngle) {
+  const c = JOINT_CONSTRAINTS[jointIdx];
+  if (!c || c.type === 'none') return { x: jx, y: jy };
+
+  const angle = Math.atan2(jy - joints[jointIdx].y, jx - joints[jointIdx].x);
+
+  if (c.type === 'absolute') {
+    const clamped = Math.max(c.minAngle, Math.min(c.maxAngle, angle));
+    const dist = SEGS[jointIdx];
+    return {
+      x: joints[jointIdx].x + Math.cos(clamped) * dist,
+      y: joints[jointIdx].y + Math.sin(clamped) * dist
+    };
+  }
+
+  if (c.type === 'relative') {
+    const rel = clampAngle(angle - parentAngle);
+    const clamped = Math.max(-c.range, Math.min(c.range, rel));
+    const finalAngle = parentAngle + clamped;
+    const dist = SEGS[jointIdx];
+    return {
+      x: joints[jointIdx].x + Math.cos(finalAngle) * dist,
+      y: joints[jointIdx].y + Math.sin(finalAngle) * dist
+    };
+  }
+
+  return { x: jx, y: jy };
+}
+
+function fabrik() {
+  const dx = target.x - origin.x;
+  const dy = target.y - origin.y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+
+  outOfRange = dist > TOTAL_LEN;
+
+  if (outOfRange) {
+    const angle = Math.atan2(dy, dx);
+    let cx = origin.x, cy = origin.y;
+    joints[0] = { x: cx, y: cy };
+    for (let i = 0; i < N; i++) {
+      cx += Math.cos(angle) * SEGS[i];
+      cy += Math.sin(angle) * SEGS[i];
+      joints[i+1] = { x: cx, y: cy };
+    }
+    return;
+  }
+
+  const MAX_ITER = 15;
+  const TOL = 0.8;
+
+  for (let iter = 0; iter < MAX_ITER; iter++) {
+    joints[N].x = target.x;
+    joints[N].y = target.y;
+
+    for (let i = N - 1; i >= 0; i--) {
+      const ddx = joints[i].x - joints[i+1].x;
+      const ddy = joints[i].y - joints[i+1].y;
+      const r = Math.sqrt(ddx*ddx + ddy*ddy) || 0.001;
+      joints[i].x = joints[i+1].x + ddx / r * SEGS[i];
+      joints[i].y = joints[i+1].y + ddy / r * SEGS[i];
+    }
+
+    joints[0].x = origin.x;
+    joints[0].y = origin.y;
+
+    for (let i = 1; i <= N; i++) {
+      const ddx = joints[i].x - joints[i-1].x;
+      const ddy = joints[i].y - joints[i-1].y;
+      const r = Math.sqrt(ddx*ddx + ddy*ddy) || 0.001;
+      const parentAngle = Math.atan2(ddy, ddx);
+      const nx = joints[i-1].x + ddx / r * SEGS[i-1];
+      const ny = joints[i-1].y + ddy / r * SEGS[i-1];
+
+      if (i - 1 < N && JOINT_CONSTRAINTS[i-1].type === 'relative') {
+        let prevAngle = 0;
+        if (i >= 2) {
+          prevAngle = Math.atan2(joints[i-1].y - joints[i-2].y, joints[i-1].x - joints[i-2].x);
+        } else {
+          prevAngle = -Math.PI / 2;
+        }
+        const rel = clampAngle(parentAngle - prevAngle);
+        const c = JOINT_CONSTRAINTS[i-1];
+        const clamped = Math.max(-c.range, Math.min(c.range, rel));
+        const finalAngle = prevAngle + clamped;
+        joints[i].x = joints[i-1].x + Math.cos(finalAngle) * SEGS[i-1];
+        joints[i].y = joints[i-1].y + Math.sin(finalAngle) * SEGS[i-1];
+      } else {
+        joints[i].x = nx;
+        joints[i].y = ny;
+      }
+    }
+
+    const ex = joints[N].x - target.x;
+    const ey = joints[N].y - target.y;
+    if (Math.sqrt(ex*ex + ey*ey) < TOL) break;
+  }
+}
+
+function drawBeam(x1, y1, x2, y2, width, color, jointColor) {
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const len = Math.sqrt((x2-x1)**2 + (y2-y1)**2);
+  const hw = width / 2;
+
+  ctx.save();
+  ctx.translate(x1, y1);
+  ctx.rotate(angle);
+
+  const rx = 0, ry = -hw, rw = len, rh = width;
+  const rad = hw * 0.8;
+
+  ctx.beginPath();
+  ctx.moveTo(rx + rad, ry);
+  ctx.lineTo(rx + rw - rad, ry);
+  ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + rad);
+  ctx.lineTo(rx + rw, ry + rh - rad);
+  ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - rad, ry + rh);
+  ctx.lineTo(rx + rad, ry + rh);
+  ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - rad);
+  ctx.lineTo(rx, ry + rad);
+  ctx.quadraticCurveTo(rx, ry, rx + rad, ry);
+  ctx.closePath();
+  ctx.fillStyle = '#0d1520';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(55,138,221,0.18)';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(rx + 4, ry + hw * 0.5);
+  ctx.lineTo(rx + rw - 4, ry + hw * 0.5);
+  ctx.strokeStyle = 'rgba(74,222,128,0.12)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(rx + 4, ry + 2);
+  ctx.lineTo(rx + rw - 4, ry + 2);
+  ctx.strokeStyle = 'rgba(200,220,255,0.06)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  const slotW = Math.min(len * 0.3, 20);
+  ctx.beginPath();
+  ctx.roundRect(rx + len/2 - slotW/2, ry + hw*0.6, slotW, hw*0.8, 2);
+  ctx.strokeStyle = 'rgba(55,138,221,0.22)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawJoint(x, y, outerR, color, idx) {
+  ctx.beginPath();
+  ctx.arc(x, y, outerR, 0, Math.PI * 2);
+  ctx.fillStyle = '#080c14';
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x, y, outerR * 0.55, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(200,220,255,0.12)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x, y, outerR * 0.22, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.6;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  const cs = outerR * 0.4;
+  ctx.beginPath();
+  ctx.moveTo(x - cs, y); ctx.lineTo(x + cs, y);
+  ctx.moveTo(x, y - cs); ctx.lineTo(x, y + cs);
+  ctx.strokeStyle = 'rgba(200,220,255,0.15)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+}
+
+function drawGripper(x, y, angle) {
+  const gap = gripClose ? 2 : (10 - gripAnim * 8);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+
+  const fw = 14, fh = 5;
+  [-(gap/2 + fh/2), (gap/2 + fh/2)].forEach((offset, i) => {
+    ctx.save();
+    ctx.translate(4, offset);
+    ctx.fillStyle = '#0d1520';
+    ctx.strokeStyle = i === 0 ? '#4ade80' : '#378add';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(0, -fh/2, fw, fh, 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  ctx.beginPath();
+  ctx.arc(0, 0, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#0d1520';
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawBase() {
+  const ox = origin.x, oy = origin.y;
+
+  ctx.beginPath();
+  ctx.moveTo(ox - 28, oy + 10);
+  ctx.lineTo(ox + 28, oy + 10);
+  ctx.lineTo(ox + 20, oy - 2);
+  ctx.lineTo(ox - 20, oy - 2);
+  ctx.closePath();
+  ctx.fillStyle = '#0d1a2a';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(55,138,221,0.3)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(ox - 32, oy + 10);
+  ctx.lineTo(ox + 32, oy + 10);
+  ctx.fillStyle = '#0a1420';
+  ctx.fill();
+  ctx.fillRect(ox - 32, oy + 10, 64, 10);
+  ctx.strokeStyle = 'rgba(55,138,221,0.2)';
+  ctx.strokeRect(ox - 32, oy + 10, 64, 10);
+
+  ctx.beginPath();
+  ctx.arc(ox, oy - 2, 10, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a2a40';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(55,138,221,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(ox, oy - 2, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#378add';
+  ctx.fill();
+}
+
+function drawReachCircle() {
+  ctx.beginPath();
+  ctx.arc(origin.x, origin.y, TOTAL_LEN, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(55,138,221,0.06)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 10]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawHUD(x, y) {
+  hudRot += 0.008;
+  hudPulse += 0.06;
+  const t = performance.now() / 1000;
+  const pulse = 1 + Math.sin(hudPulse) * 0.12;
+  const r = 32 * pulse;
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.strokeStyle = 'rgba(255,68,68,0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.6, 0, Math.PI * 2); ctx.stroke();
+
+  ctx.save();
+  ctx.rotate(hudRot);
+  for (let i = 0; i < 4; i++) {
+    ctx.save();
+    ctx.rotate(i * Math.PI / 2);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.2, 0.2, Math.PI/2 - 0.2);
+    ctx.strokeStyle = '#ff4444';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.rotate(-hudRot * 0.5);
+  for (let i = 0; i < 6; i++) {
+    ctx.save();
+    ctx.rotate(i * Math.PI / 3);
+    const tick = r * 0.18;
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 0.85);
+    ctx.lineTo(0, -r * 0.85 - tick);
+    ctx.strokeStyle = 'rgba(255,68,68,0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+
+  const arm = r * 0.55, gap = r * 0.25;
+  ctx.strokeStyle = 'rgba(255,68,68,0.7)';
+  ctx.lineWidth = 1;
+  [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dx,dy]) => {
+    ctx.beginPath();
+    ctx.moveTo(dx * gap, dy * gap);
+    ctx.lineTo(dx * (gap + arm), dy * (gap + arm));
+    ctx.stroke();
+  });
+
+  ctx.beginPath();
+  ctx.arc(0, 0, 3 + Math.sin(hudPulse * 2) * 1.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#ff4444';
+  ctx.fill();
+
+  ctx.font = '400 9px JetBrains Mono, monospace';
+  ctx.fillStyle = 'rgba(255,68,68,0.8)';
+  ctx.textAlign = 'center';
+  ctx.fillText('OUT OF RANGE', 0, r * 1.6 + 14);
+
+  const ex = Math.round(x), ey = Math.round(y);
+  ctx.fillStyle = 'rgba(255,68,68,0.4)';
+  ctx.font = '300 8px JetBrains Mono, monospace';
+  ctx.fillText(`${ex}, ${ey}`, 0, r * 1.6 + 26);
+
+  ctx.restore();
+}
+
+function drawCursorDot(x, y) {
+  ctx.beginPath();
+  ctx.arc(x, y, 3, 0, Math.PI * 2);
+  ctx.fillStyle = outOfRange ? '#ff4444' : '#ffffff';
+  ctx.fill();
+}
+
+function drawArm() {
+  for (let i = 0; i < N; i++) {
+    drawBeam(
+      joints[i].x, joints[i].y,
+      joints[i+1].x, joints[i+1].y,
+      SEG_WIDTHS[i],
+      JOINT_COLORS[i]
+    );
+  }
+
+  const jRadii = [10, 8, 7, 6, 5, 4.5, 4];
+  for (let i = 0; i <= N; i++) {
+    drawJoint(joints[i].x, joints[i].y, jRadii[i], JOINT_COLORS[Math.min(i, N-1)], i);
+  }
+
+  const ee = joints[N];
+  const prev = joints[N-1];
+  const angle = Math.atan2(ee.y - prev.y, ee.x - prev.x);
+  drawGripper(ee.x, ee.y, angle);
+}
+
+function loop() {
+  ctx.clearRect(0, 0, W, H);
+
+  fabrik();
+  drawReachCircle();
+  drawBase();
+  drawArm();
+
+  if (outOfRange) {
+    drawHUD(target.x, target.y);
+    reachInd.textContent = 'ARM: OUT OF RANGE';
+    reachInd.classList.add('out');
+  } else {
+    drawCursorDot(target.x, target.y);
+    reachInd.textContent = 'ARM: IN RANGE';
+    reachInd.classList.remove('out');
+  }
+
+  if (gripClose && gripAnim < 1) gripAnim = Math.min(1, gripAnim + 0.15);
+  if (!gripClose && gripAnim > 0) gripAnim = Math.max(0, gripAnim - 0.15);
+
+  requestAnimationFrame(loop);
+}
+
+window.addEventListener('mousemove', e => {
+  target.x = e.clientX;
+  target.y = e.clientY;
+});
+
+window.addEventListener('mousedown', () => { gripClose = true; });
+window.addEventListener('mouseup', () => { gripClose = false; });
+
+window.addEventListener('resize', resize);
+resize();
+loop();
+</script>
+</body>
+</html>
