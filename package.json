@@ -1,0 +1,20 @@
+{
+  "name": "nathaniel-handan-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dynamic static-first portfolio with reviews, contact and lightweight analytics APIs.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "docker:build": "docker build -t nathaniel-portfolio .",
+    "smoke": "node -e \"fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/api/health').then(r=>{if(!r.ok)process.exit(1);return r.json()}).then(console.log)\""
+  },
+  "dependencies": {
+    "@splinetool/runtime": "latest",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
